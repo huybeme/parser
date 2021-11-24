@@ -1,0 +1,74 @@
+expression-statement
+expression
+logical expression
+relational expression
+additive expression
+multiplicative expression
+unary expression (+, -, ! operators only)
+postfix expression (only the call to primary expression, not the function call, array, or ++)
+primary expression
+
+
+<expression-statement> ::= <expression> ;
+
+<expression> ::= { <identifier> <assignment-operator> }? <logical-expression>
+*always assume that there will be an assignment operator
+
+<assignment-operator> ::= = | += | -=
+
+<logical-expression> ::= <relational-expression>
+			{ <logical-operator> <relational-expression> }*
+			
+<relational-expression> ::= <additive-expression>
+			{ <relational-operator> <additive-expression> }*
+			
+<logical-operator> ::= && | ||
+			
+<relational-operator> ::= < | <= | > | >= | == | !=
+
+<additive-expression> ::= <multiplicative-expression>
+			{ <additive-operator> <multiplicative-expression> }*
+			
+<additive-operator> ::= + | -
+
+<multiplicative-expression> ::= <unary-expression> 
+				{ <multiplicative-operator> <unary-expression> }*
+
+<multiplicative-operator> ::= * | / | %
+
+<unary-expression> ::= { <unary_operator> }? <postfix-expression>
+
+<unary-operator> ::= + | - | & | * | !
+
+
+<postfix-expression> ::= <primary-expression> { 
+			[ <expression> ]                            arrays
+			|	( <expression> { , <expression> }* )   function call very important, 0 or more expressions
+			|	++
+			|	--
+			}*
+
+<primary-expression> ::= <identifier> | <string> | <integer> | <char> | <float>
+			|  ( <expression> ) 
+			
+			
+			
+			
+(-57.3*2+ 80)==5 && orange!=21  ; 
+
+operator		(
+unary operator		-
+float			57.3
+multiplicative op	*
+integer		2
+additive op		+
+integer		80
+relational op		==
+integer		5
+relational op		&&
+varible - zero		orange / 0
+relational op		!=
+integer		21
+the end		;
+
+
