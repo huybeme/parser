@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+int Expression();   // prototyping
 
 int check_if_exist(FILE *file, char* name)
 {
@@ -28,8 +29,7 @@ char* input_string;
 enum type{TYPE_INTEGER, TYPE_FLOAT, TYPE_STRING, TYPE_CHAR, TYPE_COMMENT,
     TYPE_TYPE, TYPE_RESERVED, TYPE_OPERATOR, TYPE_IDENTIFIER, TYPE_INVALID, TYPE_WHITESPACE,
     TYPE_UNARY};
-FILE *input_file;
-Token t;
+FILE *input_file, *printout;
 
 
 const char* getType(enum type t){
@@ -59,7 +59,8 @@ const char* getType(enum type t){
 
 // advances nexttoken
 void next(){
-    ptr++;
+    while(input_string[ptr] == ' ' || input_string[ptr] == '\t' || input_string[ptr] == '\n')
+        ptr++;
 }
 
 // reached end of input
@@ -126,7 +127,7 @@ void printcolor(Token *token){
     }
 }
 
-void accept(Token *token, int tptr, enum type type1, char* line){
+Token accept(Token *token, int tptr, enum type type1, char* line){
     int len = tptr - ptr +1;
     token->type = type1;
     token->length = len;
@@ -142,7 +143,9 @@ void accept(Token *token, int tptr, enum type type1, char* line){
     if (matchdatatype(token->str) == 1)
         token->type = TYPE_TYPE;
 
-//    ptr = tptr;
+    ptr = tptr;
+
+
 //    return token;
 }
 
@@ -208,6 +211,14 @@ void identifyNextToken(Token *token){
             }
             else if ((input_string[tptr] == '=' || input_string[tptr] == '<' || input_string[tptr] == '>' || input_string[tptr] == '!')
                      && input_string[tptr +1] == '='){
+                tptr++;
+                accept(token, tptr, TYPE_OPERATOR, input_string);
+            }
+            else if (input_string[tptr] == '&' && input_string[tptr +1] == '&'){
+                tptr++;
+                accept(token, tptr, TYPE_OPERATOR, input_string);
+            }
+            else if (input_string[tptr] == '|' && input_string[tptr +1] == '|'){
                 tptr++;
                 accept(token, tptr, TYPE_OPERATOR, input_string);
             }
@@ -296,10 +307,8 @@ void identifyNextToken(Token *token){
 }
 
 int match(char* string, int type){
-//    Token t;
+    Token t;
     identifyNextToken(&t);
-//    GetToken(&t);
-//    printf("%s: %s  [%d]\n", getType(t.type), t.str, ptr);
     if (strcmp(t.str, string) == 0 && t.type == type)
         return 1;
 
@@ -308,62 +317,75 @@ int match(char* string, int type){
 
 // find the type of the next token
 int matchtype(int type){
-//    Token t;
+
+    Token t;
     identifyNextToken(&t);
-//    printf("%s: %s  [%d]\n", getType(t.type), t.str, ptr);
-    GetToken(&t);
     if (t.type == type)
         return 1;
     return 0;
 }
 
-void GetToken(Token *token){
-    while (strcmp(getType(token->type), "TYPE_WHITESPACE") == 0 ||
-           strcmp(getType(token->type), "TYPE_COMMENT") == 0){
+void GetToken(Token *t){
+    while (strcmp(getType(t->type), "TYPE_WHITESPACE") == 0 ||
+           strcmp(getType(t->type), "TYPE_COMMENT") == 0){
         ptr++;
-        identifyNextToken(token);
+        identifyNextToken(t);
     }
 }
 
-float primaryval, retval;
 int PrimaryExpression(){
 
-    if (matchtype(TYPE_IDENTIFIER)){
-        printf("parsing IDENTIFIER\n");
-        retval = 0;
-        next();
+    // get a token that is not a whitespace or comment
+    Token t;
+    identifyNextToken(&t);
+    GetToken(&t);
+
+    GetToken(&t);
+    printf("got %s: %s    [%d]\n", getType(t.type), t.str, ptr);
+
+    if (strcmp(getType(t.type), "TYPE_INTEGER") == 0){
+        // got integer so move ptr;
+        ptr++;
+        return atoi(t.str);
     }
-    else if (matchtype(TYPE_INTEGER)){
-        printf("parsing INT: %s\n", t.str);
-        GetToken(&t);
-        retval = atoi(t.str);
-        next();
+    else if (strcmp(getType(t.type), "TYPE_FLOAT") == 0){
+        // floats will be rounded to the nearest whole digit and turned into an int
+        int i = 0;
+        while (t.str[i] != '.'){
+            i++;
+        }
+        int val;
+        if (t.str[i+1] >= '5')
+            val = atoi(t.str) +1;
+        else
+            val = atoi(t.str);
+
+        ptr++;
+        return val;
     }
-    else if (matchtype(TYPE_FLOAT)){
-        printf("parsing FLOAT\n");
-        GetToken(&t);
-        retval = atof(t.str);
-        next();
-    }
-    else if (matchtype(TYPE_CHAR)){
-        printf("parsing CHAR\n");
-        GetToken(&t);
-        retval = t.str[1];
-        next();
-    }
-    else if (matchtype(TYPE_STRING)){
-        printf("parsing STRING\n");
-        retval = 0;
-        next();
-    }
-    else{
-        printf("SYNTAX ERROR IN PRIMARY EXPRESSION\n");
-        //exit(0);
+    else if (strcmp(getType(t.type), "TYPE_STRING") == 0){
+        ptr++;
         return 0;
     }
-    printf("\t%s: %s  [%d]\n", getType(t.type), t.str, ptr);
+    else if (strcmp(getType(t.type), "TYPE_CHAR") == 0){
+        ptr++;
+        // return decimal value here
+        if (t.str[1] == '\\')
+            return t.str[2];
+        else
+            return t.str[1];
+    }
+    else if (strcmp(getType(t.type), "TYPE_IDENTIFIER") == 0){
+        ptr++;
+        return 0;
+    }
+    else if (strcmp(t.str, "(") == 0){
+        ptr++;
+        int val = Expression();
+        return val;
+    }
 
-    return 1;
+    return -99;
 }
 
 int PostFixExpression(){
@@ -375,90 +397,125 @@ int PostFixExpression(){
 
 int UnaryExpression(){
 
-    // 0 dont do anything, 1 means -, 2 means !
-    int unaryop = 0;
+    // if !0, return 0 and if !# then return the #
 
-    if (matchtype(TYPE_OPERATOR))
-    {
-        if(match("+",TYPE_OPERATOR))
-        {
-            printf("parse unary: +\n");
-            next();
-        }
-        else if(match("-",TYPE_OPERATOR))
-        {
-            printf("parse unary: -\n");
-            unaryop = 1;
-            next();
-        }
-        else if(match("!",TYPE_OPERATOR))
-        {
-            printf("parse unary: !\n");
-            unaryop = 2;
-            next();
-        }
-        else {
-            printf("NOT A VALID UNARY OPERATOR\n");
-            return 0;
-        }
+    Token prevtoken;
+    identifyNextToken(&prevtoken);
+    GetToken(&prevtoken);
 
+    int firstvalue = PostFixExpression();
+
+    if (matchtype(TYPE_OPERATOR) && (strcmp(getType(prevtoken.type), "TYPE_OPERATOR") == 0 || ptr == 0)){
+        Token utoken;
+        identifyNextToken(&utoken);
+        GetToken(&utoken);
+
+//        printf("(u) %s  %s\n", prevtoken.str, utoken.str);
+
+        if (match("-", TYPE_OPERATOR)) {
+            printf("    unary token: %s\n", utoken.str);
+            ptr++;
+            int nextvalue = PostFixExpression();
+            return -nextvalue;
+        }
+//        else if (match("+", TYPE_OPERATOR)){
+//            printf("    unary token: %s\n", utoken.str);
+//            ptr++;
+//            int nextvalue = PostFixExpression();
+//            return nextvalue;
+//        }
+        else if (match("!", TYPE_OPERATOR)){
+            ptr++;
+            int nextvalue = UnaryExpression();  // need to call unary for - token to check for negative numbers
+            if (nextvalue == 0)
+                return 1;
+            else
+                return 0;
+        }
     }
 
-    if(!PostFixExpression())
-        return 0;
-
-    //retval now is the result of primary
-    printf("do unary operator evaluation here\n");
-    //set retval to be based on unary operator
-
-    if (unaryop==1)
-    {
-        retval = -retval;
-    }
-    else if (unaryop==2)
-    {
-        if(retval==0)
-            retval=1;
-        else
-            retval=0;
+    if (firstvalue == -99){
+        Token t;
+        identifyNextToken(&t);
+        GetToken(&t);
+        printf("__either expression sums to -99 or you got an incorrect entry for primary expression__\n"
+               "%s\n", t.str);
     }
 
-    return 1;
+    return firstvalue;
 
 }
 
 int MultiplicativeExpression(){
 
-    UnaryExpression();
-    int saveptr = ptr;
+    int firstvalue = UnaryExpression();
 
-    if (matchtype(TYPE_OPERATOR)){
-        ptr = saveptr;
-        next();
-        printf("%c  [%d]\n", input_string[ptr], ptr);
-        if (match("*", TYPE_OPERATOR)){
-            next();
-            Token nexttoken;
-            identifyNextToken(&nexttoken);
-            GetToken(&nexttoken);
-            printf("%s  [%d]\n", nexttoken.str, ptr);
+    while(1){
 
-            if (UnaryExpression()){
-                GetToken(&nexttoken);
-                float temp = atof(nexttoken.str);
-                printf("%s  [%d]__%f\n", nexttoken.str, ptr, temp);
+        Token optoken;
+        identifyNextToken(&optoken);
+        GetToken(&optoken);
+
+        if (match("*", TYPE_OPERATOR) || match("/", TYPE_OPERATOR) || match("%", TYPE_OPERATOR)){
+            printf("    multi token: %s       [%d]\n", optoken.str, ptr);
+
+            // move ptr to next token
+            ptr++;
+            int nextvalue = UnaryExpression();
+
+//            Token nexttoken;
+//            identifyNextToken(&nexttoken);
+//            GetToken(&nexttoken);
+
+            if (strcmp(optoken.str, "*") == 0){
+                firstvalue *= nextvalue;
             }
+            else if (strcmp(optoken.str, "/") == 0){
+                firstvalue /= nextvalue;
+            }
+            else
+                firstvalue %= nextvalue;
+
         }
+        else break;
     }
 
-
-    return 0;
+    return firstvalue;
 }
 
 int AdditiveExpression(){
 
     int firstvalue = MultiplicativeExpression();
 
+    while(1){
+
+        Token optoken;
+        identifyNextToken(&optoken);
+        GetToken(&optoken);
+
+//        if  (match(")", TYPE_OPERATOR))     // move past ) when we get it
+//            ptr++;
+
+        if (match("+", TYPE_OPERATOR) || match("-", TYPE_OPERATOR)){
+            printf("    add token: %s       [%d]\n", optoken.str, ptr);
+
+            // move ptr to next token and get its value
+            ptr++;
+            int nextvalue = MultiplicativeExpression();
+
+//            Token nexttoken;
+//            identifyNextToken(&nexttoken);
+//            GetToken(&nexttoken);
+
+            if (strcmp(optoken.str, "+") == 0){
+                firstvalue += nextvalue;
+            }
+            else
+                firstvalue -= nextvalue;
+
+        }
+        else break;
+    }
 
     return firstvalue;
 
@@ -468,13 +525,85 @@ int RelationalExpression(){
 
     int firstvalue = AdditiveExpression();
 
+
+    while(1){
+
+        if (match(")", TYPE_OPERATOR))     // move past ) when we get it
+            ptr++;
+        else
+            ptr--;
+
+        Token reltoken;
+        identifyNextToken(&reltoken);
+        GetToken(&reltoken);
+
+        if (strcmp(reltoken.str, "<") == 0 || strcmp(reltoken.str, "<=") == 0 || strcmp(reltoken.str, "==") == 0
+            || strcmp(reltoken.str, "!=") == 0 || strcmp(reltoken.str, ">") == 0 || strcmp(reltoken.str, ">=") == 0){
+            printf("    relational operator: %s     [%d]\n", reltoken.str, ptr);
+            ptr++;
+            int nextvalue = AdditiveExpression();
+
+            if (strcmp(reltoken.str, "<") == 0)
+                firstvalue = firstvalue < nextvalue;
+            else if (match("<=", TYPE_OPERATOR))
+                firstvalue = firstvalue <= nextvalue;
+            else if (match(">", TYPE_OPERATOR))
+                firstvalue = firstvalue > nextvalue;
+            else if (match(">=", TYPE_OPERATOR))
+                firstvalue = firstvalue >= nextvalue;
+            else if (strcmp(reltoken.str, "!=") == 0)
+                firstvalue = firstvalue != nextvalue;
+            else
+                firstvalue = firstvalue == nextvalue;
+
+        }
+        else break;
+    }
+
+
+
     return firstvalue;
 }
 
 int LogicalExpression(){
 
     int firstvalue = RelationalExpression();
-    printf("\tanswer is: %f     [%d]\n", retval, ptr);
+
+    while(1){
+
+        if (match(")", TYPE_OPERATOR)) {     // move past ) when we get it
+            ptr++;
+            printf("    found closing ')' token\n");
+        }
+        else
+            ptr--;
+
+        Token logtoken;
+        identifyNextToken(&logtoken);
+        GetToken(&logtoken);
+//        printf("%s  [%d]\n", logtoken.str, ptr);
+
+        if (strcmp(logtoken.str, "&&") == 0 || strcmp(logtoken.str, "||") == 0){
+            printf("    logical operator: %s     [%d]\n", logtoken.str, ptr);
+            ptr++;
+            int nextvalue = RelationalExpression();
+//            printf("%d  %d\n",firstvalue, nextvalue);
+
+            if (strcmp(logtoken.str, "&&") == 0)
+                if (firstvalue == 1 && nextvalue == 1)
+                    return 1;
+                else
+                    return 0;
+            else {
+                if (firstvalue == 1 || nextvalue == 1)
+                    return 1;
+                else
+                    return 0;
+            }
+
+        }
+        else break;
+    }
     return firstvalue;
 }
 
@@ -482,7 +611,7 @@ int LogicalExpression(){
 int Expression(){
 
     int firstvalue = LogicalExpression();
-
+    printf("\tanswer is: %d     [%d]\n", firstvalue, ptr);
 
 
     return firstvalue;
@@ -496,8 +625,6 @@ int main(int argc, char* argv[]) {
 
     if (argv[1] != '\0')    // if something is passed through terminal
         input = argv[1];
-    else if (check_if_exist(input_file, input) == 0)     // not running in IDE or nothing passed in terminal, run itself
-        input = "main.c";
 
     input_file = fopen(input, "r");
     if (check_if_exist(input_file, input) == 0)         // if nothing can open, close program
@@ -521,7 +648,6 @@ int main(int argc, char* argv[]) {
     input_string[input_length] = 0;
     fclose(input_file);
 
-//    Token token;
 
     Expression();
 
