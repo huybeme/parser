@@ -399,9 +399,11 @@ int UnaryExpression(){
 
     // if !0, return 0 and if !# then return the #
 
+    int saveptr = ptr;
     Token prevtoken;
     identifyNextToken(&prevtoken);
     GetToken(&prevtoken);
+    ptr = saveptr;
 
     int firstvalue = PostFixExpression();
 
