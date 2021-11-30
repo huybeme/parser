@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 int Expression();   // prototyping
+int FindBracket();
 
 int check_if_exist(FILE *file, char* name)
 {
@@ -69,7 +70,7 @@ int doneWithInput(){
     return 0;
 }
 
-int matchdatatype(char* id){
+int matchdatatype(char* id){    // should we have a struct type here?
     if (strcmp(id, "void") == 0 || strcmp(id, "char") == 0 || strcmp(id, "int") == 0 || strcmp(id, "float") == 0){
         return 1;
     }
@@ -257,11 +258,13 @@ void identifyNextToken(Token *token){
             if (input_string[tptr] == '\0') // no ending quotes, syntax error
                 break;
         }
-        if (input_string[ptr] == input_string[tptr])
+
+        if (input_string[ptr] == input_string[tptr]) {
             accept(token, tptr, TYPE_STRING, input_string);
+        }
         else {
             accept(token, tptr, TYPE_INVALID, input_string);
-            printf("2___%d\n", tptr);
+            printf("2___[%d]%s\n", tptr, token->str);
         }
     }
         // check for integers   -- need to check for hexidecimals
@@ -285,10 +288,9 @@ void identifyNextToken(Token *token){
             accept(token, tptr, TYPE_INTEGER, input_string);
     }
         //check for identifiers (state 1)
-    else if ((input_string[ptr] >= 65 && input_string[ptr] <= 90) || (input_string[ptr] >= 97 && input_string[ptr] <= 122)){
-        while ((input_string[tptr] >= 65 && input_string[tptr] <= 90) || (input_string[tptr] >= 97 && input_string[tptr] <= 122) ||
-               (input_string[tptr] >= 48 && input_string[tptr] <= 57) || input_string[tptr] == '_' || input_string[tptr] == '.' ||
-               input_string[tptr] == '\n' || input_string[tptr] == '\t'){
+    else if ((input_string[ptr] >= 65 && input_string[ptr] <= 90) || (input_string[ptr] >= 97 && input_string[ptr] <= 122)){            // start with a letter
+        while ((input_string[tptr] >= 65 && input_string[tptr] <= 90) || (input_string[tptr] >= 97 && input_string[tptr] <= 122) ||     // if its a letter
+               (input_string[tptr] >= 48 && input_string[tptr] <= 57) || input_string[tptr] == '_' || input_string[tptr] == '.'){       // or digits, _, or .
             tptr++;
         }
         tptr--; // decrement due to while loop
@@ -301,7 +303,7 @@ void identifyNextToken(Token *token){
     }
     else{
         accept(token, tptr, TYPE_INVALID, input_string);
-        printf("3___%d\n", tptr);
+        printf("3___[%d]    %s\n", tptr, token->str);
     }
 
 }
@@ -340,7 +342,6 @@ int PrimaryExpression(){
     identifyNextToken(&t);
     GetToken(&t);
 
-    GetToken(&t);
     printf("got %s: %s    [%d]\n", getType(t.type), t.str, ptr);
 
     if (strcmp(getType(t.type), "TYPE_INTEGER") == 0){
@@ -399,9 +400,11 @@ int UnaryExpression(){
 
     // if !0, return 0 and if !# then return the #
 
+    int saveptr = ptr;
     Token prevtoken;
     identifyNextToken(&prevtoken);
     GetToken(&prevtoken);
+    ptr = saveptr;
 
     int firstvalue = PostFixExpression();
 
@@ -533,9 +536,13 @@ int RelationalExpression(){
         else
             ptr--;
 
+        if (input_string[ptr] == '"' || (input_string[ptr] == '\''))    // hard fix for type string or char, stack smash error
+            ptr++;
+
         Token reltoken;
         identifyNextToken(&reltoken);
         GetToken(&reltoken);
+
 
         if (strcmp(reltoken.str, "<") == 0 || strcmp(reltoken.str, "<=") == 0 || strcmp(reltoken.str, "==") == 0
             || strcmp(reltoken.str, "!=") == 0 || strcmp(reltoken.str, ">") == 0 || strcmp(reltoken.str, ">=") == 0){
@@ -578,10 +585,18 @@ int LogicalExpression(){
         else
             ptr--;
 
+
+        if (input_string[ptr] == '"' || (input_string[ptr] == '\'') || (input_string[ptr] == '.'))    // hard fix for type string or char, stack smash error
+            ptr++;
+
         Token logtoken;
         identifyNextToken(&logtoken);
         GetToken(&logtoken);
+
+
+
 //        printf("%s  [%d]\n", logtoken.str, ptr);
+
 
         if (strcmp(logtoken.str, "&&") == 0 || strcmp(logtoken.str, "||") == 0){
             printf("    logical operator: %s     [%d]\n", logtoken.str, ptr);
@@ -611,6 +626,7 @@ int LogicalExpression(){
 int Expression(){
 
     int firstvalue = LogicalExpression();
+
     printf("\tanswer is: %d     [%d]\n", firstvalue, ptr);
 
 
